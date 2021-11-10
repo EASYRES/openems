@@ -1,0 +1,18 @@
+# Initial build image, used with gradle base to build OpenEMS first - enforces 64-bit Intel/AMD format initially
+FROM --platform=amd64 archlinux:latest
+
+RUN pacman -Syu --noconfirm && pacman -S --noconfirm nodejs npm && npm install -g @angular/cli
+
+COPY . /opt/OpenEMS
+WORKDIR /opt/OpenEMS/ui
+
+RUN npm update
+RUN ng build -c backend
+
+# Deployment image, only the minimal jar and java runtime - will be made in the target architecture, based on build parameters
+FROM nginx:latest
+WORKDIR /usr/share/nginx/html
+COPY --from=0 /opt/OpenEMS/ui/target/backend /usr/share/nginx/html
+
+# Network configuration
+EXPOSE 80/tcp

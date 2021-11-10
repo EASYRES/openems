@@ -1,0 +1,34 @@
+# Initial build image, used with gradle base to build OpenEMS first - enforces 64-bit Intel/AMD format initially
+#FROM --platform=amd64 gradle:latest
+FROM --platform=amd64 openjdk:8
+
+COPY . /opt/openems
+WORKDIR /opt/openems
+
+RUN ./gradlew build jar
+RUN ./gradlew buildEdge
+
+
+# Deployment image, only the minimal jar and java runtime - will be made in the target architecture, based on build parameters
+FROM openjdk
+WORKDIR /usr/lib/openems
+COPY --from=0 /opt/openems/build/openems-edge.jar /usr/lib/openems/openems-edge.jar
+
+# Make a data directory
+RUN mkdir -p /var/openems/data
+
+# Make a config directory - ToDo: bind mount the config outside the container!
+RUN mkdir -p /etc/openems.d
+COPY --from=0 /opt/openems/tools/docker/openems-edge/config.d/* /etc/openems.d
+
+### Network configuration ###
+# Apache Felix Web Console
+EXPOSE 8080/tcp
+
+# JSON/REST Api
+EXPOSE 8084/tcp
+
+# JSON/Websocket Api
+EXPOSE 8085/tcp
+
+CMD ["java", "-Dopenems.data.dir=/var/openems/data", "-Dfelix.cm.dir=/etc/openems.d/", "-jar", "/usr/lib/openems/openems-edge.jar"]

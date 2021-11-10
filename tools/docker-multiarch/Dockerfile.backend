@@ -1,0 +1,37 @@
+# Initial build image, used with gradle base to build OpenEMS first - enforces 64-bit Intel/AMD format initially
+FROM --platform=amd64 gradle:latest
+
+COPY . /opt/OpenEMS
+WORKDIR /opt/OpenEMS
+
+#RUN sh gradlew jar
+RUN sh gradlew buildBackend
+
+# Deployment image, only the minimal jar and java runtime - will be made in the target architecture, based on build parameters
+FROM openjdk:latest
+
+WORKDIR /opt/openems-backend
+RUN mkdir /opt/openems-backend/config.d
+
+COPY --from=0 /opt/OpenEMS/build/openems-backend.jar /opt/openems-backend/openems-backend.jar
+
+# Make a config directory - ToDo: bind mount the config outside the container!
+RUN mkdir /etc/openems.d
+
+### Network configuration ###
+# Backend-to-Backend JSON/REST Api
+EXPOSE 8075/tcp
+
+# Backend-to-Backend JSON/Websocket Api
+EXPOSE 8076/tcp
+
+# Apache Felix Web Console
+EXPOSE 8079/tcp
+
+# Edge-Websocket
+EXPOSE 8081/tcp
+
+# UI-Websocket
+EXPOSE 8082/tcp
+
+CMD [ "java", "-XX:+ExitOnOutOfMemoryError", "-Dfelix.cm.dir=/opt/openems-backend/config.d", "-Djava.util.concurrent.ForkJoinPool.common.parallelism=100", "-jar", "/opt/openems-backend/openems-backend.jar" ]
